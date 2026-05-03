@@ -18,10 +18,10 @@ pip install -r requirements.txt
 
 ```bash
 # Default: original transcript + English translation, txt + docx
-python main.py "<https://www.youtube.com/watch?v=dQw4w9WgXcQ>"
+python main.py "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
 # Translate to Chinese instead
-python main.py "<https://youtu.be/dQw4w9WgXcQ>" --lang zh-Hans
+python main.py "https://youtu.be/dQw4w9WgXcQ" --lang zh-Hans
 
 # Only the original, no translation
 python main.py "<url>" --skip-translation
@@ -56,7 +56,7 @@ scripts/
 ## How it works
 
 1. Resolve the URL (or bare id) to an 11-character video id.
-2. Use [`youtube-transcript-api`](<https://github.com/jdepoix/youtube-transcript-api>)
+2. Use [`youtube-transcript-api`](https://github.com/jdepoix/youtube-transcript-api)
    to list available caption tracks; prefer uploader-provided over
    auto-generated for the "original".
 3. If `--lang` differs from the original and the track is translatable, ask

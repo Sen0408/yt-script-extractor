@@ -38,12 +38,12 @@ def video_id_from_url(url_or_id: str) -> str:
     parsed = urlparse(url_or_id)
     host = (parsed.hostname or "").lower()
 
-    if host in {"<youtu.be>"}:
+    if host in {"youtu.be"}:
         vid = parsed.path.lstrip("/").split("/")[0]
         if _YOUTUBE_ID_RE.match(vid):
             return vid
 
-    if "<youtube.com>" in host or "<youtube-nocookie.com>" in host:
+    if "youtube.com" in host or "youtube-nocookie.com" in host:
         qs = parse_qs(parsed.query)
         if "v" in qs and _YOUTUBE_ID_RE.match(qs["v"][0]):
             return qs["v"][0]

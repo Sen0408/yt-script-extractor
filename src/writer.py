@@ -18,7 +18,7 @@ def _header(script: Script) -> str:
     if script.is_translated:
         kind += ", translated by YouTube"
     return (
-        f"YouTube video: <https://www.youtube.com/watch?v={script.video_id}\n>"
+        f"YouTube video: https://www.youtube.com/watch?v={script.video_id}\n"
         f"Language: {script.language_name} ({script.language})\n"
         f"Source: {kind}\n"
         f"{'-' * 60}\n"
@@ -49,7 +49,7 @@ def write_docx(script: Script, path: Path, with_timestamps: bool = True) -> Path
 
     doc = Document()
     doc.add_heading(f"Transcript - {script.video_id}", level=1)
-    doc.add_paragraph(f"URL: <https://www.youtube.com/watch?v={script.video_id}>")
+    doc.add_paragraph(f"URL: https://www.youtube.com/watch?v={script.video_id}")
     doc.add_paragraph(f"Language: {script.language_name} ({script.language})")
     kind = "auto-generated" if script.is_generated else "uploader-provided"
     if script.is_translated:
