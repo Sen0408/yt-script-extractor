@@ -59,10 +59,17 @@ def _segments_to_text(segments: list[dict]) -> str:
     return "\n".join(seg["text"].strip() for seg in segments if seg.get("text"))
 
 
+def _fetched_to_segments(fetched) -> list[dict]:
+    return [
+        {"text": s.text, "start": s.start, "duration": s.duration}
+        for s in fetched
+    ]
+
+
 def fetch_original(video_id: str) -> Script:
     """Return the best-available original transcript. Manual > auto-generated."""
     try:
-        listing = YouTubeTranscriptApi.list_transcripts(video_id)
+        listing = YouTubeTranscriptApi().list(video_id)
     except TranscriptsDisabled as e:
         raise RuntimeError(f"Transcripts are disabled for video {video_id}.") from e
 
@@ -73,7 +80,8 @@ def fetch_original(video_id: str) -> Script:
         raise RuntimeError(f"No transcripts available for video {video_id}.")
 
     transcript = candidates[0]
-    segments = transcript.fetch()
+    fetched = transcript.fetch()
+    segments = _fetched_to_segments(fetched)
     return Script(
         video_id=video_id,
         language=transcript.language_code,
@@ -88,7 +96,7 @@ def fetch_original(video_id: str) -> Script:
 def fetch_translated(video_id: str, target_language: str) -> Script | None:
     """Translate to target_language via YouTube. None if already in that lang."""
     try:
-        listing = YouTubeTranscriptApi.list_transcripts(video_id)
+        listing = YouTubeTranscriptApi().list(video_id)
     except TranscriptsDisabled:
         return None
 
@@ -108,7 +116,8 @@ def fetch_translated(video_id: str, target_language: str) -> Script | None:
             return None
 
     translated = source.translate(target_language)
-    segments = translated.fetch()
+    fetched = translated.fetch()
+    segments = _fetched_to_segments(fetched)
     return Script(
         video_id=video_id,
         language=translated.language_code,
