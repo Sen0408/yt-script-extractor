@@ -1,0 +1,62 @@
+name: Extract transcript
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "YouTube URL or 11-character video id"
+        required: true
+        type: string
+      lang:
+        description: "Translation target language (ISO code, e.g. en, zh-Hans, es)"
+        required: false
+        type: string
+        default: "en"
+      skip_translation:
+        description: "Skip translation, save only the original"
+        required: false
+        type: boolean
+        default: false
+      no_timestamps:
+        description: "Omit per-line timestamps"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Run extractor
+        env:
+          URL: ${{ inputs.url }}
+          LANG: ${{ inputs.lang }}
+          SKIP: ${{ inputs.skip_translation }}
+          NOTS: ${{ inputs.no_timestamps }}
+        run: |
+          set -euo pipefail
+          ARGS=("$URL" --lang "$LANG" --out scripts)
+          if [ "$SKIP" = "true" ]; then
+            ARGS+=(--skip-translation)
+          fi
+          if [ "$NOTS" = "true" ]; then
+            ARGS+=(--no-timestamps)
+          fi
+          python main.py "${ARGS[@]}"
+
+      - name: Upload transcripts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: transcripts
+          path: scripts/
+          if-no-files-found: error
