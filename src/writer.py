@@ -1,4 +1,4 @@
-"""Write a Script out as .txt and/or .docx."""
+"""Write a Script or Analysis out as .txt and/or .docx."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -70,7 +70,83 @@ def write_docx(script: Script, path: Path, with_timestamps: bool = True) -> Path
     return path
 
 
+def write_analysis_txt(analysis, path: Path) -> Path:
+    sep = "=" * 60
+    lines = [
+        f"YouTube video: https://www.youtube.com/watch?v={analysis.video_id}",
+        f"Language: {analysis.language}",
+        f"Word count: {analysis.word_count:,}  |  Estimated watch time: {analysis.estimated_watch_minutes} min",
+        f"Analysis method: {analysis.method}",
+        sep, "",
+        "SUMMARY", "-" * 40, "",
+        analysis.summary, "",
+        sep, "",
+        "KEY POINTS", "-" * 40, "",
+    ]
+    for point in analysis.key_points:
+        lines.append(f"  • {point}")
+    lines += [
+        "", sep, "",
+        "DEEP DIVE", "-" * 40, "",
+        analysis.deep_dive, "",
+        sep, "",
+        "AI COMMENTS", "-" * 40, "",
+        analysis.ai_comments, "",
+        sep, "",
+        "TOPICS", "-" * 40, "",
+        "  " + ", ".join(analysis.topics),
+    ]
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return path
+
+
+def write_analysis_docx(analysis, path: Path) -> Path:
+    from docx import Document
+    from docx.shared import Pt, RGBColor
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+    doc = Document()
+
+    title = doc.add_heading(f"Video Analysis Report", level=1)
+    doc.add_paragraph(f"URL: https://www.youtube.com/watch?v={analysis.video_id}")
+    doc.add_paragraph(f"Language: {analysis.language}")
+    doc.add_paragraph(
+        f"Word count: {analysis.word_count:,}  |  "
+        f"Estimated watch time: {analysis.estimated_watch_minutes} min"
+    )
+    doc.add_paragraph(f"Analysis method: {analysis.method}")
+    doc.add_paragraph("")
+
+    doc.add_heading("Summary", level=2)
+    for para in analysis.summary.split("\n\n"):
+        if para.strip():
+            doc.add_paragraph(para.strip())
+    doc.add_paragraph("")
+
+    doc.add_heading("Key Points", level=2)
+    for point in analysis.key_points:
+        doc.add_paragraph(point, style="List Bullet")
+    doc.add_paragraph("")
+
+    doc.add_heading("Deep Dive", level=2)
+    for para in analysis.deep_dive.split("\n\n"):
+        if para.strip():
+            doc.add_paragraph(para.strip())
+    doc.add_paragraph("")
+
+    doc.add_heading("AI Comments", level=2)
+    for para in analysis.ai_comments.split("\n\n"):
+        if para.strip():
+            doc.add_paragraph(para.strip())
+    doc.add_paragraph("")
+
+    doc.add_heading("Topics", level=2)
+    doc.add_paragraph(", ".join(analysis.topics))
+
+    doc.save(path)
+    return path
+
+
 def output_paths(out_dir: Path, script: Script, suffix: str) -> dict[str, Path]:
-    """Return {format: path} for <video_id>_<suffix>_<lang>.<ext> files."""
-    base = f"{script.video_id}_{suffix}_{script.language}"
+    base = f"{suffix}_{script.language}"
     return {"txt": out_dir / f"{base}.txt", "docx": out_dir / f"{base}.docx"}

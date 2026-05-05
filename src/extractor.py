@@ -9,11 +9,20 @@ import re
 from dataclasses import dataclass
 from urllib.parse import parse_qs, urlparse
 
+import opencc
 from youtube_transcript_api import (
     NoTranscriptFound,
     TranscriptsDisabled,
     YouTubeTranscriptApi,
 )
+from youtube_transcript_api._errors import TranslationLanguageNotAvailable
+
+# When YouTube doesn't offer a Simplified Chinese track, fall back to
+# Traditional Chinese and convert with OpenCC.
+_ZH_SIMP_FALLBACKS: dict[str, tuple[str, str, str]] = {
+    "zh-Hans": ("zh-Hant", "Chinese (Simplified)", "t2s"),
+    "zh-CN":   ("zh-TW",   "Chinese (Simplified)", "t2s"),
+}
 
 
 @dataclass
@@ -66,12 +75,33 @@ def _fetched_to_segments(fetched) -> list[dict]:
     ]
 
 
-def fetch_original(video_id: str) -> Script:
-    """Return the best-available original transcript. Manual > auto-generated."""
+def fetch_video_title(video_id: str) -> str:
+    """Return the video title from the YouTube page. Falls back to video_id."""
+    import urllib.request
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            html = resp.read().decode("utf-8", errors="replace")
+        m = re.search(r'<meta property="og:title" content="([^"]+)"', html)
+        if m:
+            return m.group(1)
+        m = re.search(r'"title":"([^"]+)"', html)
+        if m:
+            return m.group(1)
+    except Exception:
+        pass
+    return video_id
+
+
+def fetch_original(video_id: str, whisper_model: str = "base") -> Script:
+    """Return the best-available original transcript. Falls back to Whisper if captions are disabled."""
     try:
         listing = YouTubeTranscriptApi().list(video_id)
-    except TranscriptsDisabled as e:
-        raise RuntimeError(f"Transcripts are disabled for video {video_id}.") from e
+    except TranscriptsDisabled:
+        from .transcriber import transcribe_video
+        print(f"      captions disabled — falling back to Whisper transcription")
+        return transcribe_video(video_id, model=whisper_model)
 
     manual = [t for t in listing if not t.is_generated]
     generated = [t for t in listing if t.is_generated]
@@ -115,13 +145,31 @@ def fetch_translated(video_id: str, target_language: str) -> Script | None:
         except StopIteration:
             return None
 
-    translated = source.translate(target_language)
-    fetched = translated.fetch()
-    segments = _fetched_to_segments(fetched)
+    try:
+        translated = source.translate(target_language)
+        lang_code = translated.language_code
+        lang_name = translated.language
+        fetched = translated.fetch()
+        segments = _fetched_to_segments(fetched)
+    except TranslationLanguageNotAvailable:
+        fallback = _ZH_SIMP_FALLBACKS.get(target_language)
+        if fallback is None:
+            raise
+        fallback_lang, lang_name, opencc_cfg = fallback
+        translated = source.translate(fallback_lang)
+        fetched = translated.fetch()
+        segments = _fetched_to_segments(fetched)
+        converter = opencc.OpenCC(opencc_cfg)
+        for seg in segments:
+            seg["text"] = converter.convert(seg["text"])
+        lang_code = target_language
+        print(f"      '{target_language}' not available via YouTube; "
+              f"converted from '{fallback_lang}' using OpenCC")
+
     return Script(
         video_id=video_id,
-        language=translated.language_code,
-        language_name=translated.language,
+        language=lang_code,
+        language_name=lang_name,
         is_generated=source.is_generated,
         is_translated=True,
         text=_segments_to_text(segments),
@@ -133,6 +181,7 @@ __all__ = [
     "Script",
     "fetch_original",
     "fetch_translated",
+    "fetch_video_title",
     "video_id_from_url",
     "NoTranscriptFound",
     "TranscriptsDisabled",

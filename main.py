@@ -6,11 +6,38 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
-from src.extractor import fetch_original, fetch_translated, video_id_from_url
-from src.writer import output_paths, write_docx, write_txt
+# Ensure UTF-8 output on Windows consoles
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if sys.stderr.encoding and sys.stderr.encoding.lower() != "utf-8":
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+from src.extractor import fetch_original, fetch_translated, fetch_video_title, video_id_from_url
+from src.writer import (
+    output_paths,
+    write_analysis_docx,
+    write_analysis_txt,
+    write_docx,
+    write_txt,
+)
+
+_WIN_INVALID = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+
+def _safe_folder_name(title: str, video_id: str) -> str:
+    sanitized = _WIN_INVALID.sub("", title).strip().strip(".")
+    sanitized = re.sub(r"\s+", " ", sanitized)[:80].strip()
+    return f"{sanitized} [{video_id}]" if sanitized else video_id
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -30,6 +57,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                    help="Omit per-line timestamps in the output files.")
     p.add_argument("--skip-translation", action="store_true",
                    help="Only save the original-language transcript.")
+    p.add_argument("--analyze", "-a", action="store_true",
+                   help="Run Claude analysis (summary, key points, topics).")
+    p.add_argument("--notion", "-n", action="store_true",
+                   help="Publish analysis to Notion. Requires --analyze and NOTION_TOKEN.")
+    p.add_argument("--whisper-model", default="base",
+                   choices=["tiny", "base", "small", "medium", "large"],
+                   help="Whisper model for fallback transcription. Default: base")
     return p.parse_args(argv)
 
 
@@ -57,36 +91,81 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ERROR: {e}", file=sys.stderr)
         return 2
 
-    args.out.mkdir(parents=True, exist_ok=True)
-    with_ts = not args.no_timestamps
+    # --- fetch title + original first so we know whether to skip translation ---
+    print(f"Fetching '{video_id}'...")
+    title = fetch_video_title(video_id)
+    folder_name = _safe_folder_name(title, video_id)
+    out_dir = args.out / folder_name
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"[1/3] Fetching original transcript for {video_id}...")
     try:
-        original = fetch_original(video_id)
+        original = fetch_original(video_id, whisper_model=args.whisper_model)
     except RuntimeError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 1
-    print(f"      original language: {original.language_name} ({original.language})")
-    saved = _save(original, "original", args.out, formats, with_ts)
+
+    skip_translation = args.skip_translation or original.language == args.lang
+    total = 1 + (not skip_translation) + args.analyze
+    step = 1
+    with_ts = not args.no_timestamps
+
+    print(f"\n{title}")
+    print(f"Folder: {out_dir}\n")
+
+    print(f"[{step}/{total}] Original transcript ({original.language_name})...")
+    saved = _save(original, "original", out_dir, formats, with_ts)
     for p in saved:
         print(f"      saved {p}")
+    step += 1
 
-    if args.skip_translation or original.language == args.lang:
-        if original.language == args.lang and not args.skip_translation:
-            print(f"[2/3] Original is already in '{args.lang}'. Skipping translation.")
-        print("[3/3] Done.")
-        return 0
+    translated = None
+    if not skip_translation:
+        print(f"[{step}/{total}] Translating to '{args.lang}'...")
+        try:
+            translated = fetch_translated(video_id, args.lang)
+        except Exception as e:
+            print(f"      ERROR: {e}", file=sys.stderr)
+            translated = None
+        if translated is None:
+            print(f"      no translatable track available for '{args.lang}'.")
+        else:
+            saved = _save(translated, args.lang, out_dir, formats, with_ts)
+            for p in saved:
+                print(f"      saved {p}")
+        step += 1
 
-    print(f"[2/3] Translating to '{args.lang}' via YouTube...")
-    translated = fetch_translated(video_id, args.lang)
-    if translated is None:
-        print(f"      no translatable track available for '{args.lang}'.")
-    else:
-        saved = _save(translated, args.lang, args.out, formats, with_ts)
-        for p in saved:
+    if args.analyze:
+        from src.analyzer import analyze
+        target_script = original  # always analyze original; translated is for reading only
+        print(f"[{step}/{total}] Analyzing ({target_script.language})...")
+        try:
+            analysis = analyze(target_script)
+        except RuntimeError as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            return 1
+        base = f"analysis_{target_script.language}"
+        if "txt" in formats:
+            p = write_analysis_txt(analysis, out_dir / f"{base}.txt")
             print(f"      saved {p}")
+        if "docx" in formats:
+            try:
+                p = write_analysis_docx(analysis, out_dir / f"{base}.docx")
+                print(f"      saved {p}")
+            except PermissionError:
+                print(f"      skipped .docx (file is open in another program)")
+        print(f"      topics: {', '.join(analysis.topics)}")
 
-    print("[3/3] Done.")
+        if args.notion:
+            from src.notion_publisher import publish
+            print(f"      publishing to Notion...")
+            try:
+                notion_url = publish(title, video_id, analysis, original)
+                print(f"      notion: {notion_url}")
+            except Exception as e:
+                print(f"      ERROR (Notion): {e}", file=sys.stderr)
+        step += 1
+
+    print(f"\nDone.")
     return 0
 
 
