@@ -6,3 +6,5 @@ python-dotenv>=1.0.0
 notion-client>=3.0.0
 yt-dlp>=2024.10.0
 openai-whisper>=20231117
+fastapi>=0.115.0
+uvicorn>=0.34.0

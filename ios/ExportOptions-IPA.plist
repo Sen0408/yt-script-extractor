@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>destination</key>
+	<string>export</string>
+	<key>manageAppVersionAndBuildNumber</key>
+	<false/>
+	<key>method</key>
+	<string>app-store-connect</string>
+	<key>provisioningProfiles</key>
+	<dict>
+		<key>com.senbing.VideoBrief</key>
+		<string>VideoBrief App Store 1</string>
+	</dict>
+	<key>signingCertificate</key>
+	<string>1F851D4F16491283FE73D86CC2D11E3EF8B081DF</string>
+	<key>signingStyle</key>
+	<string>manual</string>
+	<key>stripSwiftSymbols</key>
+	<true/>
+	<key>teamID</key>
+	<string>KKT6ZQ3UV9</string>
+	<key>testFlightInternalTestingOnly</key>
+	<true/>
+	<key>uploadSymbols</key>
+	<true/>
+</dict>
+</plist>

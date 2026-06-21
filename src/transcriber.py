@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -41,7 +42,7 @@ def _download_audio_ytdlp(video_id: str, out_path: Path) -> Path:
     url = f"https://www.youtube.com/watch?v={video_id}"
     audio_file = out_path / "audio"
     cmd = [
-        "yt-dlp", "--no-playlist",
+        sys.executable, "-m", "yt_dlp", "--no-playlist",
         "-x", "--audio-format", "mp3", "--audio-quality", "5",
         "-o", str(audio_file) + ".%(ext)s",
         url,

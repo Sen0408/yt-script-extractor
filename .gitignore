@@ -5,8 +5,14 @@ __pycache__/
 venv/
 env/
 .env
+ios/VideoBrief/Secrets.plist
+ios/VideoBriefLocal/Secrets.plist
+ios/build/
+ios/*.xcodeproj/xcuserdata/
+ios/*.xcodeproj/project.xcworkspace/xcuserdata/
 .idea/
 .vscode/
 .DS_Store
 scripts/
+data/
 *.log

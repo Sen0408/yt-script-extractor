@@ -6,6 +6,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 from pathlib import Path
@@ -47,20 +48,26 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                     "language and an auto-translated version.",
     )
     p.add_argument("url", help="YouTube URL or 11-character video id")
-    p.add_argument("--lang", "-l", default="en",
-                   help="Target translation language (ISO code). Default: en")
+    p.add_argument("--lang", "-l", default="zh-Hans",
+                   help="Target translation language when --translate is used. Default: zh-Hans")
     p.add_argument("--out", "-o", default="scripts", type=Path,
                    help="Output directory. Default: ./scripts")
     p.add_argument("--format", "-f", default="txt,docx",
                    help="Comma-separated output formats: txt, docx. Default: txt,docx")
     p.add_argument("--no-timestamps", action="store_true",
                    help="Omit per-line timestamps in the output files.")
-    p.add_argument("--skip-translation", action="store_true",
-                   help="Only save the original-language transcript.")
-    p.add_argument("--analyze", "-a", action="store_true",
-                   help="Run Claude analysis (summary, key points, topics).")
-    p.add_argument("--notion", "-n", action="store_true",
-                   help="Publish analysis to Notion. Requires --analyze and NOTION_TOKEN.")
+    p.add_argument("--translate", action="store_false", dest="skip_translation",
+                   help="Also save a YouTube auto-translated transcript.")
+    p.add_argument("--skip-translation", action="store_true", default=True,
+                   help="Only save the original-language transcript (default).")
+    p.add_argument("--analyze", "-a", action="store_true", default=True,
+                   help="Run analysis (default).")
+    p.add_argument("--no-analyze", action="store_false", dest="analyze",
+                   help="Skip analysis.")
+    p.add_argument("--notion", "-n", action="store_true", default=True,
+                   help="Publish analysis to Notion (default).")
+    p.add_argument("--no-notion", action="store_false", dest="notion",
+                   help="Skip Notion publishing.")
     p.add_argument("--whisper-model", default="base",
                    choices=["tiny", "base", "small", "medium", "large"],
                    help="Whisper model for fallback transcription. Default: base")
@@ -84,6 +91,19 @@ def main(argv: list[str] | None = None) -> int:
     if unknown:
         print(f"Unknown format(s): {', '.join(sorted(unknown))}", file=sys.stderr)
         return 2
+    if args.notion and not args.analyze:
+        print("ERROR: Notion publishing requires analysis. Use --no-notion too.", file=sys.stderr)
+        return 2
+    if args.notion:
+        missing = [k for k in ("NOTION_TOKEN", "NOTION_PARENT_PAGE_ID") if not os.environ.get(k)]
+        if missing:
+            print(
+                "ERROR: Notion publishing is enabled by default, but these .env "
+                f"values are missing: {', '.join(missing)}. "
+                "Add them or use --no-notion.",
+                file=sys.stderr,
+            )
+            return 2
 
     try:
         video_id = video_id_from_url(args.url)
@@ -136,6 +156,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.analyze:
         from src.analyzer import analyze
+        from src.library import upsert_video
         target_script = original  # always analyze original; translated is for reading only
         print(f"[{step}/{total}] Analyzing ({target_script.language})...")
         try:
@@ -155,6 +176,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"      skipped .docx (file is open in another program)")
         print(f"      topics: {', '.join(analysis.topics)}")
 
+        notion_url = None
         if args.notion:
             from src.notion_publisher import publish
             print(f"      publishing to Notion...")
@@ -163,6 +185,14 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"      notion: {notion_url}")
             except Exception as e:
                 print(f"      ERROR (Notion): {e}", file=sys.stderr)
+        upsert_video(
+            title,
+            original,
+            analysis,
+            notion_url=notion_url,
+            folder_path=out_dir,
+        )
+        print(f"      app library: saved")
         step += 1
 
     print(f"\nDone.")

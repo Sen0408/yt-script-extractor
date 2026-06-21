@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>KeepAlive</key>
+	<true/>
+	<key>Label</key>
+	<string>com.senbing.videobrief.tunnel</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>/Users/senbing/Github/yt-script-extractor/run_tunnel.sh</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StandardErrorPath</key>
+	<string>/Users/senbing/Github/yt-script-extractor/tunnel-launchd.log</string>
+	<key>StandardOutPath</key>
+	<string>/Users/senbing/Github/yt-script-extractor/tunnel-launchd.log</string>
+	<key>WorkingDirectory</key>
+	<string>/Users/senbing/Github/yt-script-extractor</string>
+</dict>
+</plist>

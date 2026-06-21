@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.senbing.videobrief.api</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/senbing/Github/yt-script-extractor/run_api.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/senbing/Github/yt-script-extractor</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/senbing/Github/yt-script-extractor/api.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/senbing/Github/yt-script-extractor/api.log</string>
+</dict>
+</plist>

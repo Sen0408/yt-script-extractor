@@ -6,6 +6,8 @@ can request YouTube's own auto-translation for any caption track.
 from __future__ import annotations
 
 import re
+import subprocess
+import sys
 from dataclasses import dataclass
 from urllib.parse import parse_qs, urlparse
 
@@ -77,6 +79,28 @@ def _fetched_to_segments(fetched) -> list[dict]:
 
 def fetch_video_title(video_id: str) -> str:
     """Return the video title from the YouTube page. Falls back to video_id."""
+    try:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "yt_dlp",
+                "--skip-download",
+                "--no-warnings",
+                "--print",
+                "title",
+                f"https://www.youtube.com/watch?v={video_id}",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+        title = result.stdout.strip().splitlines()[-1] if result.stdout.strip() else ""
+        if result.returncode == 0 and title:
+            return title
+    except Exception:
+        pass
+
     import urllib.request
     url = f"https://www.youtube.com/watch?v={video_id}"
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
